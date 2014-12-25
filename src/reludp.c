@@ -35,14 +35,15 @@ ru_socket* listen_on_ru_socket(char *addr, int port)
 
 int ru_recv_file(ru_socket *l_sock, char *filename)
 {
-    char b;
-    while( ru_recv_b(l_sock, &b) != 0)
-    {
-        if(b == EOF) break;
-        printf("%c", b);
+    ru_packet p;
 
+    while( ru_recv_p(l_sock, &p) != 0)
+    {
+        ru_print_header(&p.header);
         //get ru_packet
         //send ack
+        if (p.payload[0] == EOF)
+            break;
         //increase serno
     }
 
@@ -53,20 +54,51 @@ int ru_recv_file(ru_socket *l_sock, char *filename)
 int ru_send_file(ru_socket *srv_sock, char *filename)
 {
     int n_sent = 0;
-    char r;
+    const int max_len = 4;
+    char r[max_len];
     FILE *f = fopen(filename, "rb");
 
-    while( fread(&r, 1, 1, f) != 0 )
+    int seqn = 0;
+    int len = 0;
+
+    ru_header h;
+    h.type = t_ru_data;
+    ru_packet p;
+    p.header = h;
+
+    while( (len = fread(r, 1, max_len, f)) != 0 )
     {
-        ru_send_b(srv_sock, r);
+        //ru_send_b(srv_sock, r);
 
         //create ru_packet
+        p.header.serno = seqn++;
+        p.header.len = len;
+
+
+        memcpy(p.payload, r, len);
+
+        ru_print_header(&h);
+
         //send ru_packet
+        sendto(srv_sock->sockfd,
+               &p, sizeof(p.header)+p.header.len, 0,
+               (struct sockaddr *)&(srv_sock->addr),
+               sizeof(srv_sock->addr));
+
         //wait for ack (start timer)
         //if timer is out, resend
         //else, send next block and increase serno
     }
-    ru_send_b(srv_sock, EOF);
+
+    h.serno++;
+    p.payload[0] = EOF;
+
+    sendto(srv_sock->sockfd,
+           &p, sizeof(p.header)+1, 0,
+           (struct sockaddr *)&(srv_sock->addr),
+           sizeof(srv_sock->addr));
+
+
 
     fclose(f);
     return 0;
@@ -81,4 +113,21 @@ int ru_recv_b(ru_socket *l_sock, char *b)
 {
     struct sockaddr_in remote;
     return recvfrom(l_sock->sockfd, b, 1, 0, (struct sockaddr *)&remote, &(l_sock->len));
+}
+
+int ru_send_p(ru_socket *srv_sock, ru_packet *p)
+{
+    int res;
+    res = sendto(srv_sock->sockfd,
+           &p, sizeof(p), 0,
+           (struct sockaddr *)&(srv_sock->addr),
+           sizeof(srv_sock->addr));
+
+    return res;
+}
+
+int ru_recv_p(ru_socket *l_sock, ru_packet *p)
+{
+    struct sockaddr_in remote;
+    return recvfrom(l_sock->sockfd, p, sizeof(ru_packet), 0, (struct sockaddr *)&remote, &(l_sock->len));
 }

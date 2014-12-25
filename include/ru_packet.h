@@ -1,8 +1,7 @@
 #ifndef PACKET_H
 #define PACKET_H
 
-#define CTRL 0
-#define DATA 1
+typedef enum { t_ru_ctrl, t_ru_data } ru_sock_t;
 
 typedef struct {
     int type;
@@ -11,8 +10,10 @@ typedef struct {
 } ru_header;
 
 typedef struct {
-    ru_header  *header;
-    char *payload;
+    ru_header  header;
+    char payload[1500];
 } ru_packet;
+
+void ru_print_header(ru_header *h);
 
 #endif
