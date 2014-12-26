@@ -15,6 +15,9 @@ ru_socket* connect_to_ru_socket(char *addr, int port)
     hp = gethostbyname(addr);
     memcpy(&(rs->addr.sin_addr.s_addr), hp->h_addr, hp->h_length);
 
+    struct timeval tv = {0, 100000};
+    setsockopt(rs->sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval*)&tv, sizeof(struct timeval));
+
     return rs;
 }
 
@@ -40,13 +43,18 @@ int ru_recv_file(ru_socket *l_sock, char *filename)
     int serno = 0;
     ack.header.type = t_ru_ctrl;
 
+    int cnt = 0;
+    int len = 0;
+
     while( ru_recv_p(l_sock, &p) != 0)
     {
-        if (p.header.serno == serno)
+        if (p.header.serno == serno && ++cnt % 2)
         {
             ack.header.len = 1;
             ack.header.serno = serno;
+
             ru_send_p(l_sock, &ack);
+            puts("ACK is sent");
 
             serno++;
         }
@@ -82,13 +90,17 @@ int ru_send_file(ru_socket *srv_sock, char *filename)
         while( 1 )
         {
             ru_send_p(srv_sock, &p);
-            ru_recv_p(srv_sock, &ack);
+            int r = ru_recv_p(srv_sock, &ack);
 
-            if( ack.header.type == t_ru_ctrl && ack.header.serno == seqn)
+            if( r != -1 && ack.header.type == t_ru_ctrl && ack.header.serno == seqn)
             {
                 puts("ACK ok");
                 seqn++;
                 break;
+            }
+            else
+            {
+                puts("Retransmission...");
             }
         }
     }
