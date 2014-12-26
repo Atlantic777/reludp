@@ -36,9 +36,21 @@ ru_socket* listen_on_ru_socket(char *addr, int port)
 int ru_recv_file(ru_socket *l_sock, char *filename)
 {
     ru_packet p;
+    ru_packet ack;
+    int serno = 0;
+    ack.header.type = t_ru_ctrl;
 
     while( ru_recv_p(l_sock, &p) != 0)
     {
+        if (p.header.serno == serno)
+        {
+            ack.header.len = 1;
+            ack.header.serno = serno;
+            ru_send_p(l_sock, &ack);
+
+            serno++;
+        }
+
         if (p.payload[0] == EOF)
             break;
     }
@@ -57,23 +69,34 @@ int ru_send_file(ru_socket *srv_sock, char *filename)
     int seqn = 0;
     int len = 0;
 
+    ru_packet ack;
     ru_packet p;
     p.header.type = t_ru_data;
 
     while( (len = fread(r, 1, max_len, f)) != 0 )
     {
-        p.header.serno = seqn++;
+        p.header.serno = seqn;
         p.header.len = len;
         memcpy(p.payload, r, len);
 
-        ru_send_p(srv_sock, &p);
+        while( 1 )
+        {
+            ru_send_p(srv_sock, &p);
+            ru_recv_p(srv_sock, &ack);
+
+            if( ack.header.type == t_ru_ctrl && ack.header.serno == seqn)
+            {
+                puts("ACK ok");
+                seqn++;
+                break;
+            }
+        }
     }
 
     p.header.serno++;
     p.header.len = 1;
     p.payload[0] = EOF;
     ru_send_p(srv_sock, &p);
-
 
     fclose(f);
     return 0;
@@ -104,6 +127,12 @@ int ru_send_p(ru_socket *srv_sock, ru_packet *p)
 
 int ru_recv_p(ru_socket *l_sock, ru_packet *p)
 {
-    struct sockaddr_in remote;
-    return recvfrom(l_sock->sockfd, p, sizeof(ru_packet), 0, (struct sockaddr *)&remote, &(l_sock->len));
+    int res;
+
+    res = recvfrom(l_sock->sockfd,
+                p, sizeof(ru_packet), 0,
+                (struct sockaddr *)&(l_sock->addr),
+                &(l_sock->len));
+
+    return res;
 }
