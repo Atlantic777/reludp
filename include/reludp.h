@@ -10,6 +10,7 @@ int        ru_recv_file(ru_socket *l_sock, char *filename);
 int        ru_send_file(ru_socket *srv_sock, char *filename);
 int        ru_send_b(ru_socket *srv_sock, char b);
 int        ru_recv_b(ru_socket *l_sock, char *b);
+int        ru_send_p(ru_socket *srv_sock, ru_packet *b);
 int        ru_recv_p(ru_socket *l_sock, ru_packet *b);
 
 #endif

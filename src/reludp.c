@@ -39,12 +39,8 @@ int ru_recv_file(ru_socket *l_sock, char *filename)
 
     while( ru_recv_p(l_sock, &p) != 0)
     {
-        ru_print_header(&p.header);
-        //get ru_packet
-        //send ack
         if (p.payload[0] == EOF)
             break;
-        //increase serno
     }
 
     puts("End of recv");
@@ -61,43 +57,22 @@ int ru_send_file(ru_socket *srv_sock, char *filename)
     int seqn = 0;
     int len = 0;
 
-    ru_header h;
-    h.type = t_ru_data;
     ru_packet p;
-    p.header = h;
+    p.header.type = t_ru_data;
 
     while( (len = fread(r, 1, max_len, f)) != 0 )
     {
-        //ru_send_b(srv_sock, r);
-
-        //create ru_packet
         p.header.serno = seqn++;
         p.header.len = len;
-
-
         memcpy(p.payload, r, len);
 
-        ru_print_header(&h);
-
-        //send ru_packet
-        sendto(srv_sock->sockfd,
-               &p, sizeof(p.header)+p.header.len, 0,
-               (struct sockaddr *)&(srv_sock->addr),
-               sizeof(srv_sock->addr));
-
-        //wait for ack (start timer)
-        //if timer is out, resend
-        //else, send next block and increase serno
+        ru_send_p(srv_sock, &p);
     }
 
-    h.serno++;
+    p.header.serno++;
+    p.header.len = 1;
     p.payload[0] = EOF;
-
-    sendto(srv_sock->sockfd,
-           &p, sizeof(p.header)+1, 0,
-           (struct sockaddr *)&(srv_sock->addr),
-           sizeof(srv_sock->addr));
-
+    ru_send_p(srv_sock, &p);
 
 
     fclose(f);
@@ -118,10 +93,11 @@ int ru_recv_b(ru_socket *l_sock, char *b)
 int ru_send_p(ru_socket *srv_sock, ru_packet *p)
 {
     int res;
+
     res = sendto(srv_sock->sockfd,
-           &p, sizeof(p), 0,
-           (struct sockaddr *)&(srv_sock->addr),
-           sizeof(srv_sock->addr));
+               p, sizeof(p->header)+p->header.len, 0,
+               (struct sockaddr *)&(srv_sock->addr),
+               sizeof(srv_sock->addr));
 
     return res;
 }
