@@ -59,8 +59,8 @@ int ru_recv_file(ru_socket *l_sock, char *filename)
             serno++;
         }
 
-        if (p.payload[0] == EOF)
-            break;
+        //if (p.payload[0] == EOF)
+        //    break;
     }
 
     puts("End of recv");
