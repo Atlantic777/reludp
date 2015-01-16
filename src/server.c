@@ -13,7 +13,7 @@
 
 #define MAX_BUFFER_SIZE 256
 
-char *addr = "127.0.0.1";
+char *addr = "0.0.0.0";
 int   port = 8888;
 char *filename = "out_file.jpg";
 int status;
