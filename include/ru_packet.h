@@ -1,7 +1,7 @@
 #ifndef PACKET_H
 #define PACKET_H
 
-typedef enum { t_ru_ctrl, t_ru_data } ru_sock_t;
+typedef enum { t_ru_ctrl, t_ru_data, t_ru_end} ru_sock_t;
 
 typedef struct {
     int type;

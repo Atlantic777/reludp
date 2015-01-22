@@ -5,6 +5,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#define N_SLEEP 1
+
 ru_socket* connect_to_ru_socket(char *addr, int port)
 {
     ru_socket *rs = get_ru_socket();
@@ -15,7 +17,7 @@ ru_socket* connect_to_ru_socket(char *addr, int port)
     hp = gethostbyname(addr);
     memcpy(&(rs->addr.sin_addr.s_addr), hp->h_addr, hp->h_length);
 
-    struct timeval tv = {0, 100000};
+    struct timeval tv = {0, N_SLEEP};
     setsockopt(rs->sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval*)&tv, sizeof(struct timeval));
 
     return rs;
@@ -43,6 +45,8 @@ int ru_recv_file(ru_socket *l_sock, char *filename)
     int serno = 0;
     ack.header.type = t_ru_ctrl;
 
+    FILE *f = fopen( filename, "wb" );
+
     int cnt = 0;
     int len = 0;
 
@@ -56,11 +60,13 @@ int ru_recv_file(ru_socket *l_sock, char *filename)
             ru_send_p(l_sock, &ack);
             puts("ACK is sent");
 
+            fwrite(p.payload, 1, p.header.len, f);
+
             serno++;
         }
 
-        //if (p.payload[0] == EOF)
-        //    break;
+        if (p.header.type == t_ru_end)
+            break;
     }
 
     puts("End of recv");
@@ -70,7 +76,7 @@ int ru_recv_file(ru_socket *l_sock, char *filename)
 int ru_send_file(ru_socket *srv_sock, char *filename)
 {
     int n_sent = 0;
-    const int max_len = 4;
+    const int max_len = 128;
     char r[max_len];
     FILE *f = fopen(filename, "rb");
 
@@ -94,8 +100,8 @@ int ru_send_file(ru_socket *srv_sock, char *filename)
 
             if( r != -1 && ack.header.type == t_ru_ctrl && ack.header.serno == seqn)
             {
-                puts("ACK ok");
                 seqn++;
+                printf("ACK ok %5d\n", seqn);
                 break;
             }
             else
@@ -105,8 +111,11 @@ int ru_send_file(ru_socket *srv_sock, char *filename)
         }
     }
 
+    puts("end of send");
+
+    p.header.type = t_ru_end;
     p.header.serno++;
-    p.header.len = 1;
+    p.header.len = 0;
     p.payload[0] = EOF;
     ru_send_p(srv_sock, &p);
 
